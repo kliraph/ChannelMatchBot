@@ -114,7 +114,7 @@ async def analyze_posts(addresses: List[str], model="gpt-4o-mini") -> str:
     analyses = []
     for channel in addresses:
         # Initial model call to determine what to do
-        resp = await client.responses.create(
+        resp = client.responses.create(
             model=model,
             input=[
                 {"role": "system", "content": system_prompt},
@@ -146,7 +146,7 @@ async def analyze_posts(addresses: List[str], model="gpt-4o-mini") -> str:
             }
 
             # Include earlier messages + function result
-            resp2 = await client.responses.create(
+            resp2 = client.responses.create(
                 model=model,
                 input=[
                     {"role": "system", "content": system_prompt},
@@ -162,13 +162,17 @@ async def analyze_posts(addresses: List[str], model="gpt-4o-mini") -> str:
             func_calls2 = [item for item in resp2.output if item.type == "function_call"]
             if func_calls2 and func_calls2[0].name == "analyze_channel":
                 analysis_args = json.loads(func_calls2[0].arguments)
-                analyses.append({**channel, **analysis_args})
+                #analyses.append({**channel, **analysis_args})              
             else:
-                analyses.append({**channel, "error": "no analyze_channel call"})
-
+                #analyses.append({**channel, "error": "no analyze_channel call"})
+                analysis_args = {"error": "no analyze_channel call"}
         else:
-            analyses.append({**channel, "error": "no fetch_posts call"})
-    
+            #analyses.append({**channel, "error": "no fetch_posts call"})
+            analysis_args = {"error": "no fetch_posts call"}
+        record = {"address": channel}
+        record.update(analysis_args)
+        analyses.append(record) 
+
     return analyses
 
 

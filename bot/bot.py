@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import os
 import pandas as pd
 from aiogram import Bot, Dispatcher, F, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -36,7 +36,11 @@ async def search_analyze_channels(brief_analysis_res, message):
     analyses = await analyze_posts(addresses)
     await message.answer(f"Генерирую отчет, это может занять пару минут...")
     report_path = generate_channel_report_excel(metadata, analyses, output_path="report.xlsx")
-    await message.answer_document(InputFile(report_path), caption="Вот ваш отчёт по каналам")
+    report_file = FSInputFile(report_path)
+    await message.answer_document(
+        document=report_file,
+        caption="Вот ваш отчёт по каналам"
+    )
     os.remove(report_path)   
 
 # Инициализация бота и диспетчера

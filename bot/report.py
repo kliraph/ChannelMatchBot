@@ -1,6 +1,8 @@
 from typing import List, Dict, Any, Union
 from jinja2 import Template
 from weasyprint import HTML
+import pandas as pd
+import openpyxl
 
 def generate_channel_report_pdf(
     metadata: pd.DataFrame,
