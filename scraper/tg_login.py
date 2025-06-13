@@ -1,4 +1,4 @@
-import time
+import asyncio
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -9,6 +9,9 @@ from telethon import TelegramClient
 from telethon.tl.functions.messages import (
     StartBotRequest,
 )
+
+from dotenv import load_dotenv
+import os
 
 def login_via_telegram():
     # 1. Launch undetected‐chromedriver
@@ -34,11 +37,11 @@ def login_via_telegram():
     
     return driver, start_token
 
-
+load_dotenv(override=True)
 
 async def authorize_tgstat(bot_username: str, start_token: str):
-    api_id   = ***REMOVED***       # ← get from https://my.telegram.org
-    api_hash = ***REMOVED***
+    api_id   = int(os.getenv("tg_api_id"))       # get from https://my.telegram.org
+    api_hash = os.getenv("tg_api_hash")
 
     client = TelegramClient("tgstat_session", api_id, api_hash)
     await client.start()
@@ -49,7 +52,7 @@ async def authorize_tgstat(bot_username: str, start_token: str):
         peer        = bot_username,
         start_param = start_token
     ))
-    time.sleep(2)
+    await asyncio.sleep(2)
     # читаем новые сообщения из диалога с ботом
     async for msg in client.iter_messages(bot_username):
         if msg.buttons:

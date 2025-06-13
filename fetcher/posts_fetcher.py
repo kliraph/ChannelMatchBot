@@ -1,16 +1,15 @@
 from telethon import TelegramClient
 from telethon.tl.functions.messages import GetHistoryRequest
 from typing import List, Dict, Any
+from dotenv import load_dotenv
+import os
 
-import json
-
-from telethon import TelegramClient
-from telethon.tl.functions.messages import GetHistoryRequest
+load_dotenv(override=True) 
 
 async def fetch_posts(
     address: str,
-    api_id: int = ***REMOVED***,
-    api_hash: str = ***REMOVED***,
+    api_id: int = int(os.getenv("tg_api_id")),
+    api_hash: str = os.getenv("tg_api_hash"),
     session_name: str = "posts_fetch_session",
     limit: int = 5
 ) -> List[Dict[str, Any]]:
@@ -40,8 +39,8 @@ async def fetch_posts(
                         "views": msg.views,
                         "link": f"https://t.me/{address.lstrip('@')}/{msg.id}"
                     })
-            with open("posts.json", "w", encoding="utf-8") as f:
-                json.dump(posts, f, ensure_ascii=False)
+            # with open("posts.json", "w", encoding="utf-8") as f:
+            #     json.dump(posts, f, ensure_ascii=False)
             return posts
 
         except Exception as e:
@@ -52,15 +51,3 @@ async def fetch_posts(
                 "views": None,
                 "link": None
             }]
-        
-
-# from telethon import functions
-
-# res = await client(functions.channels.GetSponsoredMessagesRequest(
-#     channel='@channelusername',
-#     limit=5                   # or set how many ads you'd like returned
-# ))
-# print(res.messages)  # contains only sponsored messages
-
-# for ad in res.messages:
-#     print(ad.title, ad.message, ad.url)

@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi.responses import StreamingResponse
 import io
 import pandas as pd
-from parser_refactored import parse_channels
+from scraper.parser_refactored import parse_channels
 
 class Filters(BaseModel):
     q: Optional[str] = None

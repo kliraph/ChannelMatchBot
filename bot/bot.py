@@ -1,5 +1,7 @@
 import logging
+from dotenv import load_dotenv
 import os
+import pandas as pd
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
 from aiogram.filters import CommandStart
@@ -11,17 +13,35 @@ from aiogram import Router
 from prompts.brief_analyst import analyze_brief
 from prompts.posts_analyst import analyze_posts
 from scraper.parser_refactored import load_channels_api
-from bot.report import generate_channel_report_pdf
+from bot.report import generate_channel_report_pdf, generate_channel_report_excel
 
-API_TOKEN = ***REMOVED***
+load_dotenv(override=True)
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
+# Поиск и анализ каналов
+async def search_analyze_channels(brief_analysis_res, message):
+    if "SELECT" in brief_analysis_res:
+        import sqlite3
+        DB_PATH = 'C:/Unios/Studies/Masters/Coursework/project_root/sqlite/channels.db'
+        conn = sqlite3.connect(DB_PATH)
+        metadata = pd.read_sql_query(brief_analysis_res+" LIMIT 5", conn)
+        addresses = metadata['address'].to_list()
+        conn.close()
+    else:
+        metadata = pd.DataFrame(load_channels_api(brief_analysis_res))
+        addresses = metadata['address'].to_list()
+    await message.answer(f"Найдено {len(addresses)} каналов. Анализирую посты...")
+    analyses = await analyze_posts(addresses)
+    await message.answer(f"Генерирую отчет, это может занять пару минут...")
+    report_path = generate_channel_report_excel(metadata, analyses, output_path="report.xlsx")
+    await message.answer_document(InputFile(report_path), caption="Вот ваш отчёт по каналам")
+    os.remove(report_path)   
+
 # Инициализация бота и диспетчера
-bot = Bot(token=API_TOKEN)
-storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
+bot = Bot(token=os.getenv("BOT_API_TOKEN"))
+dp = Dispatcher(storage=MemoryStorage())
 router = Router()
 
 # Описание состояний
@@ -55,23 +75,8 @@ async def process_ready(callback: types.CallbackQuery, state: FSMContext):
 async def handle_ready_brief(message: types.Message, state: FSMContext):
     brief_text = message.text
     await message.answer("Спасибо! Бриф получен. Я проанализирую его и запущу процесс поиска каналов.")
-    brief_analysis_res = analyze_brief(brief_text)
-    if "SELECT" in brief_analysis_res:
-        import sqlite3
-        import pandas as pd
-        DB_PATH = 'C:/Unios/Studies/Masters/Coursework/project_root/sqlite/channels.db'
-        conn = sqlite3.connect(DB_PATH)
-        df_cat = pd.read_sql_query(brief_analysis_res+" LIMIT 3", conn)
-        addresses = df_cat['address']
-    else:
-        parsed_data = load_channels_api(brief_analysis_res)
-        addresses = [item["address"] for item in parsed_data]
-    await message.answer(f"Найдено {len(addresses)} каналов. Анализирую посты...")
-    analyses = analyze_posts(addresses)
-    await message.answer(f"Генерирую отчет, это может занять пару минут...")
-    pdf_path = generate_channel_report_pdf(analyses, output_path="report.pdf")
-    await message.answer_document(InputFile(pdf_path), caption="Вот ваш отчёт по каналам")
-    os.remove(pdf_path)
+    brief_analysis_res = await analyze_brief(brief_text)
+    await search_analyze_channels(brief_analysis_res, message)
     await state.clear()
 
 @router.callback_query(F.data == "create_brief")
@@ -120,23 +125,8 @@ async def process_q5(message: types.Message, state: FSMContext):
         f"Другие пожелания: {data['answer5']}"
     )
     await message.answer("Спасибо! Бриф получен. Я проанализирую его и запущу процесс поиска каналов.")
-    brief_analysis_res = analyze_brief(brief_text)
-    if "SELECT" in brief_analysis_res:
-        import sqlite3
-        import pandas as pd
-        DB_PATH = 'C:/Unios/Studies/Masters/Coursework/project_root/sqlite/channels.db'
-        conn = sqlite3.connect(DB_PATH)
-        df_cat = pd.read_sql_query(brief_analysis_res+" LIMIT 3", conn)
-        addresses = df_cat['address']
-    else:
-        parsed_data = load_channels_api(brief_analysis_res)
-        addresses = [item["address"] for item in parsed_data]
-    await message.answer(f"Найдено {len(addresses)} каналов. Анализирую посты...")
-    analyses = analyze_posts(addresses)
-    await message.answer(f"Генерирую отчет, это может занять пару минут...")
-    pdf_path = generate_channel_report_pdf(analyses, output_path="report.pdf")
-    await message.answer_document(InputFile(pdf_path), caption="Вот ваш отчёт по каналам")
-    os.remove(pdf_path)
+    brief_analysis_res = await analyze_brief(brief_text)
+    await search_analyze_channels(brief_analysis_res, message)
     await state.clear()
 
 if __name__ == '__main__':

@@ -2,14 +2,14 @@ from openai import OpenAI
 from fetcher.posts_fetcher import fetch_posts
 from typing import List
 import json
+from dotenv import load_dotenv
+import os
 
-# Make sure you’ve set your API key in the environment:
-# export OPENAI_API_KEY="sk-…"
-#openai.api_key = os.getenv("OPENAI_API_KEY")
-OPENAI_API_KEY = ***REMOVED***
-client = OpenAI(api_key=OPENAI_API_KEY)
+# Инициализация клиента
+load_dotenv(override=True)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-async def analyze_posts(addresses: List, model="gpt-4o-mini") -> str:
+async def analyze_posts(addresses: List[str], model="gpt-4o-mini") -> str:
 
     system_prompt = '''
         Ты эксперт по Telegram и маркетингу. Проанализируй посты канала по следующим критериям: no_swearing, no_gore, topicality, no_contradiction, tone_of_voice. 
@@ -19,12 +19,13 @@ async def analyze_posts(addresses: List, model="gpt-4o-mini") -> str:
 
     # Define tools
     fetch_posts_def = {
+    "type": "function",
     "name": "fetch_posts",
     "description": "Return posts for the given channel",
     "parameters": {
         "type":"object",
         "properties":{
-        "address":{"type":"string"}
+            "address":{"type":"string"}
         },
         "required":["address"]
     }
@@ -112,47 +113,62 @@ async def analyze_posts(addresses: List, model="gpt-4o-mini") -> str:
 
     analyses = []
     for channel in addresses:
-        resp = client.responses.create(
+        # Initial model call to determine what to do
+        resp = await client.responses.create(
             model=model,
-            messages=[
+            input=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": channel['address']}
+                {"role": "user",   "content": channel}
             ],
-            functions=[fetch_posts_def, analyze_channel_def],
-            function_call="auto"
+            tools=[fetch_posts_def],
+            tool_choice="required"
         )
 
-        tool_calls = resp.tool_calls or []
-        # Did the model decide to call fetch_posts?
-        if tool_calls and tool_calls[0].name == "fetch_posts":
-            args = tool_calls[0].arguments
-            addr = args["address"]
+        # Find any function call in the output
+        func_calls = [item for item in resp.output if item.type == "function_call"]
 
-            posts = await fetch_posts(addr)
+        if func_calls and func_calls[0].name == "fetch_posts":
+            fc = func_calls[0]
+            args = json.loads(fc.arguments)
+            addr = args.get("address")
 
-            # Feed the posts back to the model as a tool message
-            resp2 = client.responses.create(
+            try:
+                posts = await fetch_posts(addr)
+            except Exception as e:
+                analyses.append({**channel, "error": f"fetch_posts failed: {e}"})
+                continue
+
+            # Send function call output to model for analysis
+            function_response = {
+                "type": "function_call_output",
+                "call_id": fc.call_id,
+                "output": json.dumps(posts, ensure_ascii=False),
+            }
+
+            # Include earlier messages + function result
+            resp2 = await client.responses.create(
                 model=model,
                 input=[
-                    *resp.input,   # system + user + model’s fetch_posts call
-                    {
-                        "role": "function",
-                        "name": "fetch_posts",
-                        "content": json.dumps(posts, ensure_ascii=False)
-                    }
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": channel},
+                    fc,
+                    function_response
                 ],
                 tools=[analyze_channel_def],
-                function_call="auto"
+                tool_choice="required"
             )
 
-            # Finally, extract the analyze_channel arguments
-            call2 = resp2.tool_calls[0]
-            analysis = call2.arguments
-            analyses.append({ **channel, **analysis })
+            # Extract analysis function call
+            func_calls2 = [item for item in resp2.output if item.type == "function_call"]
+            if func_calls2 and func_calls2[0].name == "analyze_channel":
+                analysis_args = json.loads(func_calls2[0].arguments)
+                analyses.append({**channel, **analysis_args})
+            else:
+                analyses.append({**channel, "error": "no analyze_channel call"})
 
         else:
-            analyses.append({ **channel, "error": "no fetch_posts call" })
-
+            analyses.append({**channel, "error": "no fetch_posts call"})
+    
     return analyses
 
 
