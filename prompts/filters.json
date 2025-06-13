@@ -1,0 +1,32 @@
+{
+  "filters": {
+    "q": null,
+    "in_about": true,
+    "categories": null,
+    "countries": null,
+    "languages": null,
+    "channel_type": null,
+    "age_from": null,
+    "age_to": null,
+    "err_from": null,
+    "err_to": null,
+    "er_from": 1.0,
+    "er_to": 10.0,
+    "male_from": null,
+    "male_to": null,
+    "female_from": null,
+    "female_to": null,
+    "participants_from": null,
+    "participants_to": null,
+    "avg_reach_from": null,
+    "avg_reach_to": null,
+    "avg_reach24_from": null,
+    "avg_reach24_to": null,
+    "ci_from": null,
+    "ci_to": null,
+    "is_verified": false,
+    "is_rkn_verified": false,
+    "is_stories_available": false
+  },
+  "channels_quantity": "<channels quantity>"
+}
