@@ -2,3 +2,4 @@ not_used/
 sqlite/
 .env
 **/__pycache__/
+.session
